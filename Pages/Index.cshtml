@@ -1,0 +1,256 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="container">
+    <div class="row">
+        <!-- Generar tabla-->
+        <form method="post" class="form-inline" asp-page-handler="GenerarTablaInicial">
+        <div class="col-12">
+            <h6 class="text-center mt-2">Generador de laberinto</h6>
+          
+                <div class="form-group">
+                <label for="tamaño">Tamaño del laberinto:</label>
+                    <input class="form-control" type="number" id="dimenciones" name="dimenciones" min="3" max="6" required  />
+                </div>
+                <button type="submit" class="btn btn-primary mt-2" >Generar tablero</button>
+            
+        </div>
+        </form>
+        <!-- Primera columna: Tabla -->
+        <div class="col-md-9">
+
+            @if (Model.Tablero != null)
+            {
+                <form asp-page-handler="ActualizarTipoDeCasilla">
+
+                <h5 class="text-center"> Tablero @Model.Tablero.GetLength(0) x @Model.Tablero.GetLength(0) </h5>
+              
+                <table class="table table-bordered">
+
+                    @for (int i = 0; i < Model.Tablero.GetLength(0); i++)
+                    {
+                        <tr>
+                            @for (int j = 0; j < Model.Tablero.GetLength(1); j++)
+                            {
+                                <td>
+                                    @Model.Tablero[i,j]
+
+                                        <select class="form-select" aria-label="Default select example" name="casillas">
+
+                                            <option value="@i|@j|Vacio" selected>Vacio</option>
+                                            <option value="@i|@j|Inicio">Inicio</option>
+                                            <option value="@i|@j|Fin">Fin</option>
+                                            <option value="@i|@j|Obstaculo">Obstaculo</option>
+                                    </select>
+                                </td>
+                            }
+                        </tr>
+                    }
+                </table>
+                <button type="submit" class="btn btn-primary mt-2">Aceptar tablero</button>
+                </form>
+            }
+
+
+            @if (Model.TableroCaminos != null)
+            {
+
+
+                <h5 class="text-center"> Tablero @Model.TableroCaminos.GetLength(0) x @Model.TableroCaminos.GetLength(0) </h5>
+
+                    <table class="table table-bordered">
+
+                    @for (int i = 0; i < Model.TableroCaminos.GetLength(0); i++)
+                        {
+                            <tr>
+                            @for (int j = 0; j < Model.TableroCaminos.GetLength(1); j++)
+                                {
+                                <td class="p-5 @(@Model.TableroCaminos[i,j].Tipo == TipoCasilla.Inicio ? "table-success" : @Model.TableroCaminos[i,j].Tipo == TipoCasilla.Obstaculo ? "table-danger" : @Model.TableroCaminos[i,j].Tipo == TipoCasilla.Fin ? "table-info" : "" )" id="@i|@j">
+                                    @Model.TableroCaminos[i,j]
+                                  
+                                    </td>
+                                }
+                            </tr>
+                        }
+                    </table>
+                <button class="btn btn-primary mt-2" onclick="generarCaminosOptimosPaso()">Pintar caminos paso a paso</button>
+                <button class="btn btn-primary mt-2" onclick="generarCaminosOptimos()">Pintar todos caminos</button>
+             
+            }
+        </div>
+    
+        <!-- Segunda columna: Formulario -->
+        <div class="col-md-3">
+          
+                @if (Model.TableroCaminos != null)
+            {
+
+                <h5 class="text-center">Estadisticas </h5>
+                <table class="table table-bordered">
+
+                    <thead>
+                        <tr> <th scope="col">Descripcion</th> <th scope="col">Valor</th></tr>
+                       
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Numero de caminos realizados</td>
+                            <td>@Model.CaminosTotales</td>
+                        </tr>
+                        <tr>
+                            <td>Numero de caminos buenos</td>
+                            <td>@Model.CaminiosBuenos</td>
+                        </tr>
+                        <tr>
+                            <td>Numero de caminos optimos</td>
+                            <td>@Model.CaminosOptimosTotal</td>
+                        </tr>
+                        <tr>
+                            <td>Peso del camino optimo</td>
+                            <td>@Model.PesoOptimo</td>
+                        </tr>
+
+                    </tbody>
+
+                </table>
+
+              
+            
+            }
+            <!-- Formulario listo -->
+
+        </div>
+
+    </div>
+</div>
+@using Newtonsoft.Json
+@{
+    var caminosOptimosJson = JsonConvert.SerializeObject(Model.CaminosOptiomosDibujar);
+}
+<script>
+
+    // optenemos los caminos por final esto para pintar si hay 2 caminos optimos o mas con diferente final
+    function obtenerCaminoOptimoPorFinal(caminosOptimos) {
+        const caminosPorFinal = {};
+
+        caminosOptimos.forEach(camino => {
+            const final = camino[camino.length - 1];
+            const finalId = `${final.X}-${final.Y}`;
+
+            if (!caminosPorFinal[finalId]) {
+                caminosPorFinal[finalId] = camino;
+            }
+        });
+
+        return Object.values(caminosPorFinal);
+    }
+
+
+    function pintarCaminoPaso(camino, clase) {
+        for (let i = 0; i < camino.length; i++) {
+            setTimeout(() => {
+                const casilla = camino[i];
+                const x = casilla.X;
+                const y = casilla.Y;
+                const celda = document.getElementById(`${x}|${y}`);
+                if (celda) {
+                    celda.classList.remove("table-warning");
+                    celda.classList.remove("table-secondary");
+                    celda.classList.remove("table-success");
+                    celda.classList.remove("table-info");
+                    celda.classList.add(clase);
+                }
+            }, i * 1000); 
+        }
+    }
+
+    function pintarCamino(camino, clase) {
+        for (let i = 0; i < camino.length; i++) {
+           
+                const casilla = camino[i];
+                const x = casilla.X;
+                const y = casilla.Y;
+                const celda = document.getElementById(`${x}|${y}`);
+                if (celda) {
+                    celda.classList.remove("table-warning");
+                    celda.classList.remove("table-secondary");
+                    celda.classList.remove("table-success");
+                    celda.classList.remove("table-info");
+                    celda.classList.add(clase);
+                }
+          
+        }
+    }
+
+
+  function limpiarCamino(camino) {
+        for (let i = 0; i < camino.length; i++) {
+                const casilla = camino[i];
+                const x = casilla.X;
+                const y = casilla.Y;
+                const tipo = casilla.Tipo;
+                const celda = document.getElementById(`${x}|${y}`);
+                if (celda) {             
+                    celda.classList.remove("table-warning");
+                    celda.classList.remove("table-secondary");
+                    celda.classList.remove("table-dark");
+                }
+
+                if(tipo == 0){
+                celda.classList.add("table-success")
+                }
+
+            if (tipo == 2) {
+                celda.classList.add("table-info")
+            }
+        }
+    }
+
+
+        // funcion que se dispara al darle click al boton
+    function generarCaminosOptimosPaso() {
+       const caminosOptimos = JSON.parse('@Html.Raw(caminosOptimosJson)');
+       const caminosUnicosPorFinal = obtenerCaminoOptimoPorFinal(caminosOptimos);
+       
+     
+        for (let i = 0; i < caminosUnicosPorFinal.length; i++) {
+ 
+            let timeout = i == 0 ? 0 : caminosUnicosPorFinal[i -1].length * 1000 * i + 50
+            let clase = i == 0 ? "table-warning" : i == 1 ? "table-secondary" : i == 2 ? "table-dark" : "table-warning"
+                setTimeout(() => {
+                for (let i = 0; i < caminosUnicosPorFinal.length; i++) {
+                    limpiarCamino(caminosUnicosPorFinal[i])
+                }
+                pintarCaminoPaso(caminosUnicosPorFinal[i], clase)
+                       
+                }, timeout);
+         }
+
+
+   }
+
+    function generarCaminosOptimos() {
+        const caminosOptimos = JSON.parse('@Html.Raw(caminosOptimosJson)');
+        const caminosUnicosPorFinal = obtenerCaminoOptimoPorFinal(caminosOptimos);
+
+
+        for (let i = 0; i < caminosUnicosPorFinal.length; i++) {
+
+           
+            let clase = i == 0 ? "table-warning" : i == 1 ? "table-secondary" : i == 2 ? "table-dark" : "table-warning"
+           
+               
+                pintarCamino(caminosUnicosPorFinal[i], clase)
+
+           
+        }
+
+
+    }
+
+</script>
+
+
